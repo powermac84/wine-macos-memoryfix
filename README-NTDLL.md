@@ -3,7 +3,7 @@
 This script rebuilds **only `ntdll.so`**, from the SHA-256-pinned original
 CrossOver 26.3 source in `inputs.json`. It applies the exact Highball CX-r27
 series, patches 0001–0024 excluding held patch 0013, then the upstream allocator
-backports 0028 and 0029. No other Wine module is rebuilt or replaced.
+backports 0028 and 0029, followed by local compatibility patch 0030. No other Wine module is rebuilt or replaced.
 
 Requirements: macOS, Xcode command-line tools/Apple clang, Bison >= 3, and a
 macOS-hosted LLVM-MinGW toolchain providing `i686-w64-mingw32-gcc` and
@@ -51,3 +51,5 @@ failures. This establishes ABI compatibility for those tests; it does not
 establish that a particular repack installer succeeds. The composed raw-archive
 engine should receive the same checks before publication, and the game
 installer is a separate endpoint test.
+
+For r2, see [the actual installer test and explicit LAA override scope](README-MEMORYFIX-R2.md). The release manifest enables `WINE_LARGE_ADDRESS_AWARE=0`; the library itself preserves prior behavior unless that exact value is supplied.

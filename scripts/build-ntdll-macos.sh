@@ -55,9 +55,9 @@ root, work, output = map(Path, sys.argv[1:])
 selected = []
 for patch in sorted((root / 'patches').glob('*.patch')):
     number = int(patch.name[:4])
-    if (number <= 24 and number != 13) or number in (28, 29):
+    if (number <= 24 and number != 13) or number in (28, 29, 30):
         selected.append(patch)
-expected = [1, 2, 3] + list(range(5, 13)) + list(range(14, 25)) + [28, 29]
+expected = [1, 2, 3] + list(range(5, 13)) + list(range(14, 25)) + [28, 29, 30]
 assert [int(p.name[:4]) for p in selected] == expected, 'Unexpected patch series'
 records = []
 for patch in selected:

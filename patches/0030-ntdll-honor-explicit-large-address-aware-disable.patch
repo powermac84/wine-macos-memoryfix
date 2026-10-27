@@ -1,0 +1,35 @@
+Subject: [PATCH] ntdll: Honor an explicit large-address-aware disable override.
+
+This is an opt-in compatibility workaround, not an upstream Wine backport.
+CrossOver's force_laa() can force large-address awareness on, but an environment
+value of 0 currently cannot override IMAGE_FILE_LARGE_ADDRESS_AWARE in the PE
+header. Honor the exact WINE_LARGE_ADDRESS_AWARE=0 value for that case too.
+Unset, 1, and every other value retain the existing behavior.
+
+A 32-bit FreeArc LargestMemoryBlock probe computes (low + high) / 2 with
+size_t, initially 0 and UINT_MAX. If its first 0x7fffffff-byte reservation
+succeeds, the next sum wraps. It eventually reaches low=1/high=0 and loops
+forever probing zero bytes. An explicit 2 GiB automatic allocation search range prevents
+that initial reservation while preserving normal LAA behavior by default.
+Native 64-bit processes retain their existing address-space behavior.
+
+Primary source for the probe's arithmetic:
+https://github.com/phyxolog/FreeArc/blob/721118f7e3e506cfde32f8febeddf274b3a83d75/Environment.cpp#L222-L230
+
+---
+diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
+--- a/dlls/ntdll/unix/virtual.c
++++ b/dlls/ntdll/unix/virtual.c
+@@ -5106,6 +5106,12 @@
+ void virtual_set_large_address_space(void)
+ {
+     BOOL large_address_space_active = ((main_image_info.ImageCharacteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE) || force_laa());
++    const char *large_address_space_override = getenv( "WINE_LARGE_ADDRESS_AWARE" );
++
++    /* Opt-in 2 GiB automatic allocation range, including PE LAA images, for
++     * 32-bit FreeArc probes whose midpoint sum overflows above the signed boundary. */
++    if (large_address_space_override && !strcmp( large_address_space_override, "0" ))
++        large_address_space_active = FALSE;
+     if (is_win64)
+     {
+         if (!is_wow64())

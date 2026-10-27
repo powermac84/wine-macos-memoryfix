@@ -1,5 +1,7 @@
 # macOS Wine virtual-memory backport
 
+Release **macos-memoryfix-r2** adds an opt-in FreeArc overflow workaround and has passed the formerly stuck installer stage in a bounded actual run. See [r2 behavior, validation and limits](README-MEMORYFIX-R2.md). This local workaround is separate from the two upstream r1 commits.
+
 Release **macos-memoryfix-r1** uses the targeted build in [README-NTDLL.md](README-NTDLL.md): only `ntdll.so` is replaced in the SHA-256-verified Highball CX r27 Wine archive. All other modules, including GStreamer, are retained. The full-build workflow documented below is an additional, separately produced variant.
 
 Experimental fork of `gauthierpiarrette/highball-engine`, based on upstream
