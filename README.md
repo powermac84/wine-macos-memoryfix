@@ -1,4 +1,7 @@
-# highball-engine
+# wine-macos-memoryfix
+
+Experimental macOS Wine fork with upstream WoW64 memory fixes **1276773** and **f4c5b04**. See [FORK.md](FORK.md) for the changes, build instructions and validation limits. The original Highball engine documentation follows.
+
 
 The Wine engine build for [Highball](https://github.com/gauthierpiarrette/highball), as a
 reproducible recipe: pinned upstream sources, a small patch series, and a CI workflow that turns

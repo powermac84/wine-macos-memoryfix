@@ -1,6 +1,6 @@
 # Builds the engine from the pinned CrossOver sources. Manual dispatch only until the first
 # build is green and boots a bottle through Highball; nothing in the app points here yet.
-name: build-engine
+name: build-memoryfix-engine
 on:
   workflow_dispatch:
     inputs:
@@ -11,7 +11,7 @@ on:
       ref_note:
         description: "why this build (free text, goes in the artifact name)"
         required: false
-        default: "manual"
+        default: "wow64-memoryfix-r1"
 permissions:
   contents: write   # the optional release step creates a release and uploads the tarball
 jobs:
@@ -33,16 +33,18 @@ jobs:
           curl -sSL -o crossover-sources.tar.gz "$url"
           echo "$sha  crossover-sources.tar.gz" | shasum -a 256 -c -
           mkdir -p src && tar -xzf crossover-sources.tar.gz -C src
-          ls src/sources/wine | head -3
+          test -f src/sources/wine/dlls/ntdll/unix/virtual.c
       - name: apply patch series
         run: |
           set -euo pipefail
           cd src/sources/wine
-          for p in ../../../patches/*.patch; do [ -e "$p" ] || continue; echo "applying $p"; patch -p1 < "$p"; done
+          for p in ../../../patches/*.patch; do [ -e "$p" ] || continue; echo "applying $p"; patch --batch --fuzz=0 -p1 < "$p"; done
+      - name: verify memory-boundary regression
+        run: python3 tests/virtualalloc/verify_backport.py src/sources/wine/dlls/ntdll/unix/virtual.c crossover-sources.tar.gz
       - name: toolchain
         run: |
           set -euo pipefail
-          brew install -q mingw-w64 bison pkg-config ccache gnutls freetype sdl2 libpng jpeg-turbo gstreamer molten-vk || true
+          brew install -q mingw-w64 bison pkg-config ccache gnutls freetype sdl2 libpng jpeg-turbo gstreamer molten-vk
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
           x86_64-w64-mingw32-gcc --version | head -1
           i686-w64-mingw32-gcc --version | head -1
@@ -72,7 +74,11 @@ jobs:
             i386_CC="ccache i686-w64-mingw32-gcc" x86_64_CC="ccache x86_64-w64-mingw32-gcc"
           make -j"$(sysctl -n hw.ncpu)"
           make install-lib
+      - name: compile virtual-memory probes
+        run: tests/virtualalloc/build.sh "$PWD/work-probes"
       - name: engine layout
+        env:
+          REF_NOTE: ${{ inputs.ref_note }}
         run: |
           set -euo pipefail
           # Highball's engine layout: engine/{bin,lib,share}, renderers/, frameworks/, tools/, manifest.json
@@ -114,10 +120,29 @@ jobs:
           strip -x -S out/engine/bin/wine out/engine/bin/wineserver 2>/dev/null || true
           echo "engine size: ${before} MB -> $(du -sm out/engine | cut -f1) MB"
           out/engine/bin/wine --version
-          name="engine-$(out/engine/bin/wine --version | tr ' ()' '-' | tr -s '-' | sed 's/-$//')-$(date -u +%Y%m%dT%H%M%SZ)-${{ github.event.inputs.ref_note }}"
+          python3 tests/virtualalloc/run_probes.py "$PWD/out/engine/bin/wine" "$PWD/work-probes" "$PWD/work-probe-prefix" "$PWD/test-results"
+          cp inputs.json out/BUILD-INPUTS.json
+          git rev-parse HEAD > out/BUILD-COMMIT.txt
+          cp -R test-results out/TEST-RESULTS
+          note=$(printf '%s' "$REF_NOTE" | tr -cd 'A-Za-z0-9._-' | cut -c1-64)
+          test -n "$note"
+          name="engine-$(out/engine/bin/wine --version | tr ' ()' '-' | tr -s '-' | sed 's/-$//')-$(date -u +%Y%m%dT%H%M%SZ)-${note}"
           tar -C out -czf "${name}.tar.gz" .
           shasum -a 256 "${name}.tar.gz" | tee "${name}.tar.gz.sha256"
           ls -la "${name}.tar.gz"
+          mkdir -p source-bundle
+          cp crossover-sources.tar.gz source-bundle/
+          cp -R patches tests/virtualalloc source-bundle/
+          cp inputs.json LICENSE NOTICE.md FORK.md source-bundle/
+          tar -C source-bundle -czf "${name}-source.tar.gz" .
+          shasum -a 256 "${name}-source.tar.gz" > "${name}-source.tar.gz.sha256"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: memoryfix-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: engine
@@ -131,6 +156,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          f=$(ls engine-*.tar.gz | head -1)
+          f=$(find . -maxdepth 1 -name 'engine-*.tar.gz' ! -name '*-source.tar.gz' -print -quit)
+          f=${f#./}
           tag="${f%.tar.gz}"
-          gh release create "$tag" "$f" "$f.sha256" --title "$tag" --notes "Wine from the pinned CrossOver source (inputs.json) with the patch series in patches/. Built by run ${{ github.run_id }}. Checksum in the .sha256 file."
+          gh release create "$tag" "$f" "$f.sha256" "${tag}-source.tar.gz" "${tag}-source.tar.gz.sha256" --prerelease --title "$tag" --notes "Experimental macOS x86_64 Wine engine with upstream WoW64 allocation fixes 1276773 and f4c5b04, based on pinned CrossOver 26.3 sources and the Highball patch series. Includes corresponding source and smoke-test results. Built by run ${{ github.run_id }}. Game/repack compatibility is not established by these tests."
