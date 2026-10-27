@@ -13,6 +13,11 @@ this engine runs through Rosetta 2.
   Alexandre Julliard: reserve a small high-address range for WoW64 top-down
   allocations. Adapted to retain CrossOver's existing `force_laa()` condition.
 
+The Rosetta DEP patch `0013` stays held, matching Highball CX r27.
+GStreamer is disabled for this installer-focused build. CoreAudio, fonts, TLS,
+SDL and MoltenVK host-library dependencies are bundled and relocated into the
+engine, so an Intel Homebrew installation is not required on the target Mac.
+
 These are the upstream fixes, not a blanket 2 GiB allocation rejection and not
 a physical RAM cap. The fork does not change Highball's installed environments.
 No game data, user logs, or proprietary Apple D3DMetal binaries are included.

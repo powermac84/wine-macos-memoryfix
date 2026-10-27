@@ -38,13 +38,19 @@ jobs:
         run: |
           set -euo pipefail
           cd src/sources/wine
-          for p in ../../../patches/*.patch; do [ -e "$p" ] || continue; echo "applying $p"; patch --batch --fuzz=0 -p1 < "$p"; done
+          for p in ../../../patches/*.patch; do
+            [ -e "$p" ] || continue
+            # Match the Rosetta compatibility policy of the released Highball CX engine.
+            case "$p" in */0013-*) echo "holding $p (as in Highball CX r27)"; continue;; esac
+            echo "applying $p"
+            patch --batch --fuzz=0 -p1 < "$p"
+          done
       - name: verify memory-boundary regression
         run: python3 tests/virtualalloc/verify_backport.py src/sources/wine/dlls/ntdll/unix/virtual.c crossover-sources.tar.gz
       - name: toolchain
         run: |
           set -euo pipefail
-          brew install -q mingw-w64 bison pkg-config ccache gnutls freetype sdl2 libpng jpeg-turbo gstreamer molten-vk
+          brew install -q mingw-w64 bison pkg-config ccache gnutls freetype sdl2 libpng jpeg-turbo molten-vk
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
           x86_64-w64-mingw32-gcc --version | head -1
           i686-w64-mingw32-gcc --version | head -1
@@ -65,13 +71,15 @@ jobs:
             --enable-archs=i386,x86_64 \
             --with-mingw \
             --without-alsa --without-capi --with-coreaudio --without-cups --without-dbus \
-            --without-fontconfig --with-freetype --with-gnutls --without-gphoto --with-gstreamer \
+            --without-fontconfig --with-freetype --with-gnutls --without-gphoto --without-gstreamer \
             --without-krb5 --without-netapi --without-oss --without-pulse \
             --without-sane --with-sdl --without-udev --without-usb --without-v4l2 --without-x \
             --disable-tests \
+            LDFLAGS="-Wl,-headerpad_max_install_names" \
             CC="ccache clang" CXX="ccache clang++" \
             CROSSCC="ccache x86_64-w64-mingw32-gcc" \
             i386_CC="ccache i686-w64-mingw32-gcc" x86_64_CC="ccache x86_64-w64-mingw32-gcc"
+          python3 ../scripts/bundle_runtime.py prepare include/config.h
           make -j"$(sysctl -n hw.ncpu)"
           make install-lib
       - name: compile virtual-memory probes
@@ -118,6 +126,7 @@ jobs:
             | xargs -0 -n 50 x86_64-w64-mingw32-strip --strip-debug 2>/dev/null || true
           find out/engine/lib/wine/x86_64-unix -name '*.so' -type f -print0 | xargs -0 -n 50 strip -x -S 2>/dev/null || true
           strip -x -S out/engine/bin/wine out/engine/bin/wineserver 2>/dev/null || true
+          python3 scripts/bundle_runtime.py bundle build/include/config.h out/engine --sources-output "$PWD/runtime-sources"
           echo "engine size: ${before} MB -> $(du -sm out/engine | cut -f1) MB"
           out/engine/bin/wine --version
           python3 tests/virtualalloc/run_probes.py "$PWD/out/engine/bin/wine" "$PWD/work-probes" "$PWD/work-probe-prefix" "$PWD/test-results"
@@ -132,7 +141,8 @@ jobs:
           ls -la "${name}.tar.gz"
           mkdir -p source-bundle
           cp crossover-sources.tar.gz source-bundle/
-          cp -R patches tests/virtualalloc source-bundle/
+          cp -R patches scripts tests/virtualalloc runtime-sources source-bundle/
+          cp .github/workflows/build.yml source-bundle/build-workflow.yml
           cp inputs.json LICENSE NOTICE.md FORK.md source-bundle/
           tar -C source-bundle -czf "${name}-source.tar.gz" .
           shasum -a 256 "${name}-source.tar.gz" > "${name}-source.tar.gz.sha256"

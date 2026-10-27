@@ -6,3 +6,8 @@
 .DS_Store
 __pycache__/
 *.pyc
+/runtime-sources/
+/source-bundle/
+/work-probes/
+/work-probe-prefix/
+/test-results/
