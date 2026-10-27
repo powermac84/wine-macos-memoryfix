@@ -1,6 +1,6 @@
 # wine-macos-memoryfix
 
-Experimental macOS Wine fork with upstream WoW64 memory fixes **1276773** and **f4c5b04**. See [FORK.md](FORK.md) for the changes, build instructions and validation limits. The original Highball engine documentation follows.
+Experimental macOS Wine fork with upstream WoW64 memory fixes **1276773** and **f4c5b04**. Release `macos-memoryfix-r1` uses a source-rebuilt `ntdll.so` in the checksum-verified Highball CX r27 Wine archive; all other Wine modules are retained. See [README-NTDLL.md](README-NTDLL.md) for that tested build and [FORK.md](FORK.md) for the additional full-build workflow and validation limits. The original Highball engine documentation follows.
 
 
 The Wine engine build for [Highball](https://github.com/gauthierpiarrette/highball), as a

@@ -1,5 +1,7 @@
 # macOS Wine virtual-memory backport
 
+Release **macos-memoryfix-r1** uses the targeted build in [README-NTDLL.md](README-NTDLL.md): only `ntdll.so` is replaced in the SHA-256-verified Highball CX r27 Wine archive. All other modules, including GStreamer, are retained. The full-build workflow documented below is an additional, separately produced variant.
+
 Experimental fork of `gauthierpiarrette/highball-engine`, based on upstream
 commit `e497c41d16a1ebfd22d8fdd307ea73439c6df7ee`. It builds an x86_64 macOS
 Wine engine from the SHA-256-pinned CrossOver 26.3 LGPL source. On Apple silicon
